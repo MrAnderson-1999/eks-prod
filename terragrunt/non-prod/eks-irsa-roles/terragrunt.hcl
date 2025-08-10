@@ -1,4 +1,3 @@
-# Include root configuration
 include "root" {
   path = find_in_parent_folders("root.hcl")
 }
@@ -12,12 +11,7 @@ dependency "eks" {
 }
 
 terraform {
-  source = "../../../../terraform/modules/iam-roles"
-}
-
-locals {
-  oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn
-  oidc_provider_url = replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")
+  source = "../../../terraform/modules/iam-roles"
 }
 
 inputs = {
@@ -31,13 +25,13 @@ inputs = {
         Statement = [{
           Effect = "Allow"
           Principal = {
-            Federated = local.oidc_provider_arn
+            Federated = dependency.eks.outputs.oidc_provider_arn
           }
           Action = "sts:AssumeRoleWithWebIdentity"
           Condition = {
             StringEquals = {
-              "${local.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:aws-node"
-              "${local.oidc_provider_url}:aud" = "sts.amazonaws.com"
+              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-node"
+              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
             }
           }
         }]
@@ -54,13 +48,13 @@ inputs = {
         Statement = [{
           Effect = "Allow"
           Principal = {
-            Federated = local.oidc_provider_arn
+            Federated = dependency.eks.outputs.oidc_provider_arn
           }
           Action = "sts:AssumeRoleWithWebIdentity"
           Condition = {
             StringEquals = {
-              "${local.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
-              "${local.oidc_provider_url}:aud" = "sts.amazonaws.com"
+              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
             }
           }
         }]
@@ -77,13 +71,13 @@ inputs = {
         Statement = [{
           Effect = "Allow"
           Principal = {
-            Federated = local.oidc_provider_arn
+            Federated = dependency.eks.outputs.oidc_provider_arn
           }
           Action = "sts:AssumeRoleWithWebIdentity"
           Condition = {
             StringEquals = {
-              "${local.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
-              "${local.oidc_provider_url}:aud" = "sts.amazonaws.com"
+              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
             }
           }
         }]

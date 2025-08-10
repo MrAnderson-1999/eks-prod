@@ -1,14 +1,3 @@
-# This module updates EKS add-ons with IRSA role ARNs after IRSA roles are created
-
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = ">= 5.60"
-    }
-  }
-}
-
 # Update VPC CNI add-on with IRSA role
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name             = var.cluster_name

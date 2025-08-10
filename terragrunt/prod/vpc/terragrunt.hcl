@@ -5,7 +5,7 @@ include "env" {
 
 # Set the source of the module
 terraform {
-  source = "${get_parent_terragrunt_dir()}/../terraform/modules/vpc"
+  source = "../../../terraform/modules/vpc"
 }
 
 # Module-specific variables

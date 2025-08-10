@@ -3,7 +3,7 @@ output "vpc_cni_addon" {
   value = {
     name    = aws_eks_addon.vpc_cni.addon_name
     version = aws_eks_addon.vpc_cni.addon_version
-    status  = aws_eks_addon.vpc_cni.status
+    arn     = aws_eks_addon.vpc_cni.arn
   }
 }
 
@@ -12,6 +12,6 @@ output "ebs_csi_addon" {
   value = {
     name    = aws_eks_addon.ebs_csi_driver.addon_name
     version = aws_eks_addon.ebs_csi_driver.addon_version
-    status  = aws_eks_addon.ebs_csi_driver.status
+    arn     = aws_eks_addon.ebs_csi_driver.arn
   }
 }

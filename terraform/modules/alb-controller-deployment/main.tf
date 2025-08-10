@@ -1,18 +1,3 @@
-# Deploy AWS Load Balancer Controller via Helm
-
-terraform {
-  required_providers {
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.10"
-    }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.30"
-    }
-  }
-}
-
 # Create service account for ALB controller
 resource "kubernetes_service_account" "aws_load_balancer_controller" {
   metadata {

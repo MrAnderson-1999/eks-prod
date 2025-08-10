@@ -23,8 +23,8 @@ dependency "kms" {
   }
 }
 
-dependency "iam_roles" {
-  config_path = "../iam-roles"
+dependency "global_roles" {
+  config_path = "../global-roles"
   mock_outputs = {
     role_arns = {
       eks_cluster    = "arn:aws:iam::123456789012:role/fake-cluster-role"
@@ -57,8 +57,8 @@ inputs = {
 
   # Security Configuration
   kms_key_arn                   = dependency.kms.outputs.kms_keys.eks_security.arn
-  cluster_service_role_arn      = dependency.iam_roles.outputs.role_arns.eks_cluster
-  node_group_role_arn          = dependency.iam_roles.outputs.role_arns.eks_node_group
+  cluster_service_role_arn      = dependency.global_roles.outputs.role_arns.eks_cluster
+  node_group_role_arn          = dependency.global_roles.outputs.role_arns.eks_node_group
   additional_security_group_ids = [dependency.security.outputs.security_group_ids.eks_nodes]
 
   # Node Configuration - Production sizing

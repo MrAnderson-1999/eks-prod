@@ -12,7 +12,7 @@ include "env" {
 
 # Set the source of the module
 terraform {
-  source = "${get_parent_terragrunt_dir()}/../terraform/modules/global-roles"
+  source = "../../../terraform/modules/iam-roles"
 }
 
 inputs = {

@@ -8,6 +8,7 @@ dependency "vpc" {
   config_path = "../vpc"
   mock_outputs = {
     vpc_id = "vpc-12345678"
+    vpc_cidr_block = "10.0.0.0/16"
   }
 }
 
@@ -68,8 +69,7 @@ inputs = {
           from_port   = 1025
           to_port     = 65535
           protocol    = "tcp"
-          # Allow communication from the VPC CIDR for now
-          cidr_blocks = ["10.0.0.0/16"]
+          cidr_blocks = [dependency.vpc.outputs.vpc_cidr_block]
         },
         {
           description = "Node to node communication (UDP)"

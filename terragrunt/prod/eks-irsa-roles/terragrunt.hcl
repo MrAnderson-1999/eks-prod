@@ -4,7 +4,7 @@ include "root" {
 }
 
 dependency "eks" {
-  config_path = "../"
+  config_path = "../eks"
   mock_outputs = {
     oidc_provider_arn       = "arn:aws:iam::123456789012:oidc-provider/fake"
     cluster_oidc_issuer_url = "https://oidc.eks.us-west-2.amazonaws.com/id/fake"

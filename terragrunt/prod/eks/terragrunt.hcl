@@ -13,7 +13,7 @@ dependency "vpc" {
 }
 
 dependency "kms" {
-  config_path = "./kms"
+  config_path = "../kms"
   mock_outputs = {
     kms_keys = {
       eks_security = {

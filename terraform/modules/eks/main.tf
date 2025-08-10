@@ -8,30 +8,31 @@ module "eks" {
   cluster_name    = var.cluster_name
   cluster_version = var.cluster_version
 
-  # VPC Configuration - CRITICAL: Use private subnets for nodes
-  vpc_id                          = var.vpc_id
-  subnet_ids                      = var.private_subnet_ids  # Control plane subnets
-  control_plane_subnet_ids        = var.private_subnet_ids  # Private subnets only
+  # VPC Configuration - FIXED
+  vpc_id     = var.vpc_id
+  subnet_ids = var.private_subnet_ids  # This is correct for control plane
 
-  # SECURITY: Private cluster configuration
-  cluster_endpoint_public_access  = false  # Private cluster for ALB ingress
+  # SECURITY: Private cluster configuration - FIXED
+  cluster_endpoint_public_access  = false
   cluster_endpoint_private_access = true
 
-  # Enable IRSA for service accounts
+  # Enable IRSA
   enable_irsa = true
 
-  # KMS encryption
-  create_kms_key = false  # Use external KMS key
-  cluster_encryption_config = {
-    provider_key_arn = var.kms_key_arn
-    resources        = ["secrets"]
-  }
+  # KMS encryption - FIXED
+  create_kms_key = false
+  cluster_encryption_config = [
+    {
+      provider_key_arn = var.kms_key_arn
+      resources        = ["secrets"]
+    }
+  ]
 
   # Logging
   cluster_enabled_log_types              = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
   cloudwatch_log_group_retention_in_days = 30
 
-  # EKS Managed Node Groups - In private subnets only
+  # EKS Managed Node Groups
   eks_managed_node_groups = {
     main = {
       name = "main-ng"
@@ -54,10 +55,10 @@ module "eks" {
         xvda = {
           device_name = "/dev/xvda"
           ebs = {
-            volume_size = 50
-            volume_type = "gp3"
-            encrypted   = true
-            kms_key_id  = var.kms_key_arn
+            volume_size           = 50
+            volume_type           = "gp3"
+            encrypted             = true
+            kms_key_id           = var.kms_key_arn
             delete_on_termination = true
           }
         }
@@ -71,7 +72,7 @@ module "eks" {
         instance_metadata_tags      = "disabled"
       }
 
-      # IAM roles (use external roles)
+      # Use external IAM role
       create_iam_role = false
       iam_role_arn    = var.node_group_role_arn
 
@@ -81,7 +82,7 @@ module "eks" {
     }
   }
 
-  # Cluster Add-ons - WITHOUT service account role ARNs initially
+  # Cluster Add-ons - Basic configuration
   cluster_addons = {
     coredns = {
       most_recent = true
@@ -91,36 +92,42 @@ module "eks" {
     }
     vpc-cni = {
       most_recent = true
-      # Service account role will be added via separate IRSA configuration
     }
     aws-ebs-csi-driver = {
       most_recent = true
-      # Service account role will be added via separate IRSA configuration
     }
   }
 
   # Use external IAM roles
-  create_iam_role            = false
-  iam_role_arn              = var.cluster_service_role_arn
-  create_node_security_group = false
+  create_iam_role = false
+  iam_role_arn    = var.cluster_service_role_arn
 
   tags = var.tags
 }
 
-module "alb_security_group" {
-  source = "../security-groups"
-  name_prefix = "${var.cluster_name}-alb-security-group"
-  security_groups = {
-    alb_to_nodes = {
-      ingress_rules = [
-        {
-          from_port = 30000
-          to_port = 32767
-          protocol = "tcp"
-          cidr_blocks = var.vpc_cidr_blocks
-        }
-      ]
-    }
+# Add this resource to your EKS module
+resource "aws_security_group" "alb_to_nodes" {
+  name_prefix = "${var.cluster_name}-alb-to-nodes"
+  description = "Security group for ALB to nodes communication"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description = "ALB to nodes"
+    from_port   = 30000
+    to_port     = 32767
+    protocol    = "tcp"
+    cidr_blocks = var.vpc_cidr_blocks
   }
-  tags = var.tags
+
+  egress {
+    description = "All outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.cluster_name}-alb-to-nodes-sg"
+  })
 }

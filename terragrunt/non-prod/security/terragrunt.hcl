@@ -1,6 +1,6 @@
-# Include environment configuration
-include "env" {
-  path = find_in_parent_folders("terragrunt.hcl")
+# Include root configuration
+include "root" {
+  path = find_in_parent_folders("root.hcl")
 }
 
 # Get VPC outputs

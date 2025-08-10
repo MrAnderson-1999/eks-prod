@@ -165,7 +165,7 @@ inputs = {
   create_external_dns_role       = true
   create_cluster_autoscaler_role = true
   
-  # Custom IAM Roles (using the existing iam-roles module)
+  # Custom IAM Roles (using the existing global-roles module)
   iam_roles = {
     application_deployer = {
       description = "Role for application deployment in EKS"

@@ -23,7 +23,7 @@ dependency "vpc" {
 }
 
 dependency "iam_roles" {
-  config_path = "../iam-roles"
+  config_path = "../global-roles"
   mock_outputs = {
     role_arns = {
       eks_cluster                   = "arn:aws:iam::123456789012:role/mock-eks-cluster-role"

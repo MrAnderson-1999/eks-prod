@@ -1,6 +1,11 @@
-# Include environment configuration
-include "env" {
-  path = find_in_parent_folders("terragrunt.hcl")
+# Include root configuration
+include "root" {
+  path = find_in_parent_folders("root.hcl")
+}
+
+# Dependencies
+dependency "eks" {
+  config_path = "../eks"
 }
 
 # Set the source of the module
@@ -8,132 +13,126 @@ terraform {
   source = "../../../terraform/modules/iam-roles"
 }
 
+locals {
+  oidc_provider_arn = dependency.eks.outputs.oidc_provider_arn
+  oidc_provider_url = replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")
+}
+
 inputs = {
-  name_prefix = "eks-security-non-prod"
+  name_prefix = "eks-security-non-prod-irsa"
   
   roles = {
-    # EKS Cluster Service Role
-    eks_cluster = {
-      description = "IAM role for EKS cluster service"
+    vpc_cni = {
+      description = "VPC CNI IRSA role"
       assume_role_policy = jsonencode({
         Version = "2012-10-17"
         Statement = [
           {
             Effect = "Allow"
             Principal = {
-              Service = "eks.amazonaws.com"
-            }
-            Action = "sts:AssumeRole"
-          }
-        ]
-      })
-      
-      managed_policy_arns = [
-        "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-      ]
-      
-      tags = {
-        Purpose = "EKS Cluster Service Role"
-        Service = "EKS"
-      }
-    }
-    
-    # EKS Node Group Role
-    eks_node_group = {
-      description = "IAM role for EKS node groups"
-      assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [
-          {
-            Effect = "Allow"
-            Principal = {
-              Service = "ec2.amazonaws.com"
-            }
-            Action = "sts:AssumeRole"
-          }
-        ]
-      })
-      
-      managed_policy_arns = [
-        "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
-        "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
-        "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-      ]
-      
-      tags = {
-        Purpose = "EKS Node Group Role"
-        Service = "EKS"
-      }
-    }
-    
-    # EKS Pod Execution Role (for Fargate if needed)
-    eks_fargate_pod_execution = {
-      description = "IAM role for EKS Fargate pod execution"
-      assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [
-          {
-            Effect = "Allow"
-            Principal = {
-              Service = "eks-fargate-pods.amazonaws.com"
-            }
-            Action = "sts:AssumeRole"
-          }
-        ]
-      })
-      
-      managed_policy_arns = [
-        "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
-      ]
-      
-      tags = {
-        Purpose = "EKS Fargate Pod Execution Role"
-        Service = "EKS"
-      }
-    }
-    
-    # AWS Load Balancer Controller Role
-    aws_load_balancer_controller = {
-      description = "IAM role for AWS Load Balancer Controller"
-      assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [
-          {
-            Effect = "Allow"
-            Principal = {
-              Federated = "arn:aws:iam::740047840996:oidc-provider/OIDC_PROVIDER_URL"  # Will be updated after EKS creation
+              Federated = local.oidc_provider_arn
             }
             Action = "sts:AssumeRoleWithWebIdentity"
             Condition = {
               StringEquals = {
-                "OIDC_PROVIDER_URL:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
-                "OIDC_PROVIDER_URL:aud" = "sts.amazonaws.com"
+                "${local.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:aws-node"
+                "${local.oidc_provider_url}:aud" = "sts.amazonaws.com"
               }
             }
           }
         ]
       })
-      
+      managed_policy_arns = [
+        "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+      ]
+      tags = {
+        Purpose = "VPC CNI IRSA Role"
+        Service = "VPC CNI"
+      }
+    }
+
+    ebs_csi_driver = {
+      description = "EBS CSI driver IRSA role"
+      assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+          {
+            Effect = "Allow"
+            Principal = {
+              Federated = local.oidc_provider_arn
+            }
+            Action = "sts:AssumeRoleWithWebIdentity"
+            Condition = {
+              StringEquals = {
+                "${local.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+                "${local.oidc_provider_url}:aud" = "sts.amazonaws.com"
+              }
+            }
+          }
+        ]
+      })
+      managed_policy_arns = [
+        "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+      ]
+      tags = {
+        Purpose = "EBS CSI Driver IRSA Role"
+        Service = "EBS CSI Driver"
+      }
+    }
+
+    aws_load_balancer_controller = {
+      description = "AWS Load Balancer Controller IRSA role"
+      assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+          {
+            Effect = "Allow"
+            Principal = {
+              Federated = local.oidc_provider_arn
+            }
+            Action = "sts:AssumeRoleWithWebIdentity"
+            Condition = {
+              StringEquals = {
+                "${local.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
+                "${local.oidc_provider_url}:aud" = "sts.amazonaws.com"
+              }
+            }
+          }
+        ]
+      })
       inline_policies = {
-        load_balancer_controller = {
+        alb_controller_policy = {
           policy = jsonencode({
             Version = "2012-10-17"
             Statement = [
               {
                 Effect = "Allow"
                 Action = [
-                  "iam:CreateServiceLinkedRole",
+                  "iam:CreateServiceLinkedRole"
+                ]
+                Resource = "*"
+                Condition = {
+                  StringEquals = {
+                    "iam:AWSServiceName" = "elasticloadbalancing.amazonaws.com"
+                  }
+                }
+              },
+              {
+                Effect = "Allow"
+                Action = [
                   "ec2:DescribeAccountAttributes",
                   "ec2:DescribeAddresses",
                   "ec2:DescribeAvailabilityZones",
                   "ec2:DescribeInternetGateways",
                   "ec2:DescribeVpcs",
+                  "ec2:DescribeVpcPeeringConnections",
                   "ec2:DescribeSubnets",
                   "ec2:DescribeSecurityGroups",
                   "ec2:DescribeInstances",
                   "ec2:DescribeNetworkInterfaces",
                   "ec2:DescribeTags",
                   "ec2:GetCoipPoolUsage",
+                  "ec2:GetManagedPrefixListEntries",
                   "ec2:DescribeCoipPools",
                   "elasticloadbalancing:DescribeLoadBalancers",
                   "elasticloadbalancing:DescribeLoadBalancerAttributes",
@@ -176,13 +175,7 @@ inputs = {
                 Effect = "Allow"
                 Action = [
                   "ec2:AuthorizeSecurityGroupIngress",
-                  "ec2:RevokeSecurityGroupIngress"
-                ]
-                Resource = "*"
-              },
-              {
-                Effect = "Allow"
-                Action = [
+                  "ec2:RevokeSecurityGroupIngress",
                   "ec2:CreateSecurityGroup"
                 ]
                 Resource = "*"
@@ -198,7 +191,7 @@ inputs = {
                     "ec2:CreateAction" = "CreateSecurityGroup"
                   }
                   Null = {
-                    "aws:RequestedRegion" = "false"
+                    "aws:RequestTag/elbv2.k8s.aws/cluster" = "false"
                   }
                 }
               },
@@ -211,7 +204,7 @@ inputs = {
                 Resource = "*"
                 Condition = {
                   Null = {
-                    "aws:RequestedRegion" = "false"
+                    "aws:RequestTag/elbv2.k8s.aws/cluster" = "false"
                   }
                 }
               },
@@ -238,7 +231,7 @@ inputs = {
                 ]
                 Condition = {
                   Null = {
-                    "aws:RequestedRegion" = "false"
+                    "aws:RequestTag/elbv2.k8s.aws/cluster" = "true"
                     "aws:ResourceTag/elbv2.k8s.aws/cluster" = "false"
                   }
                 }
@@ -274,10 +267,10 @@ inputs = {
           })
         }
       }
-      
+      managed_policy_arns = []  # Remove the non-existent policy
       tags = {
         Purpose = "AWS Load Balancer Controller IRSA Role"
-        Service = "EKS"
+        Service = "ALB Controller"
       }
     }
   }

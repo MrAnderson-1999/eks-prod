@@ -1,18 +1,23 @@
 # =============================================================================
-# Root Terragrunt Configuration - All Environments
+# Non-Production Environment Root Configuration
 # =============================================================================
-# This file centralizes backend configuration and provider generation
-# for all environments and modules.
 
+# Load environment-specific variables
 locals {
-  # These will be provided by the module's terragrunt.hcl file
-  # which includes both root and env configurations
+  env_vars = read_terragrunt_config("${get_parent_terragrunt_dir()}/env.hcl")
+  
+  # Environment-specific values
+  name          = local.env_vars.locals.name
+  region        = local.env_vars.locals.region
+  stage         = local.env_vars.locals.stage
+  bucket_suffix = "ac97c39c"
+  kms_key       = "arn:aws:kms:us-west-2:740047840996:key/af7b51eb-4fae-435e-b563-1248347b5892"
 }
 
 # Generate an AWS provider block
 generate "provider" {
   path      = "provider.tf"
-  if_exists = "skip"
+  if_exists = "overwrite_terragrunt"
   contents  = <<EOF
 provider "aws" {
   region = "${local.region}"
@@ -38,12 +43,12 @@ remote_state {
     if_exists = "overwrite_terragrunt"
   }
   config = {
-    bucket         = "${local.name}-${local.stage}-terraform-state-${local.bucket_suffixes[local.stage]}"
+    bucket         = "${local.name}-${local.stage}-terraform-state-${local.bucket_suffix}"
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = local.region
     encrypt        = true
     dynamodb_table = "${local.name}-${local.stage}-terraform-lock"
-    kms_key_id     = local.kms_keys[local.stage]
+    kms_key_id     = local.kms_key
   }
 }
 

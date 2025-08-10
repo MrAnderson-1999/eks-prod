@@ -1,6 +1,3 @@
-# EKS Module - Official terraform-aws-modules/eks/aws
-# Secure private cluster configuration following AWS best practices
-
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
@@ -8,25 +5,23 @@ module "eks" {
   cluster_name    = var.cluster_name
   cluster_version = var.cluster_version
 
-  # VPC Configuration - FIXED
+  # VPC Configuration
   vpc_id     = var.vpc_id
-  subnet_ids = var.private_subnet_ids  # This is correct for control plane
+  subnet_ids = var.private_subnet_ids
 
-  # SECURITY: Private cluster configuration - FIXED
+  # SECURITY: Private cluster configuration
   cluster_endpoint_public_access  = false
   cluster_endpoint_private_access = true
 
   # Enable IRSA
   enable_irsa = true
 
-  # KMS encryption - FIXED
+  # KMS encryption - FIXED FORMAT
   create_kms_key = false
-  cluster_encryption_config = [
-    {
-      provider_key_arn = var.kms_key_arn
-      resources        = ["secrets"]
-    }
-  ]
+  cluster_encryption_config = {
+    provider_key_arn = var.kms_key_arn
+    resources        = ["secrets"]
+  }
 
   # Logging
   cluster_enabled_log_types              = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
@@ -44,10 +39,7 @@ module "eks" {
       max_size     = var.node_max_size
       desired_size = var.node_desired_size
 
-      # CRITICAL: Nodes in private subnets only
       subnet_ids = var.private_subnet_ids
-
-      # Security configurations
       vpc_security_group_ids = var.additional_security_group_ids
 
       # EBS encryption
@@ -72,7 +64,6 @@ module "eks" {
         instance_metadata_tags      = "disabled"
       }
 
-      # Use external IAM role
       create_iam_role = false
       iam_role_arn    = var.node_group_role_arn
 
@@ -82,7 +73,7 @@ module "eks" {
     }
   }
 
-  # Cluster Add-ons - Basic configuration
+  # Basic add-ons without IRSA (will be updated later)
   cluster_addons = {
     coredns = {
       most_recent = true
@@ -92,9 +83,11 @@ module "eks" {
     }
     vpc-cni = {
       most_recent = true
+      # IRSA role will be added via separate configuration
     }
     aws-ebs-csi-driver = {
       most_recent = true
+      # IRSA role will be added via separate configuration
     }
   }
 
@@ -105,7 +98,7 @@ module "eks" {
   tags = var.tags
 }
 
-# Add this resource to your EKS module
+# ALB to nodes security group
 resource "aws_security_group" "alb_to_nodes" {
   name_prefix = "${var.cluster_name}-alb-to-nodes"
   description = "Security group for ALB to nodes communication"

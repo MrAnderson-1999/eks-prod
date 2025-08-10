@@ -5,7 +5,7 @@ include "root" {
 
 # Set the source of the module
 terraform {
-  source = "../../../../terraform/modules/kms"
+  source = "../../../terraform/modules/kms"
 }
 
 inputs = {

@@ -16,24 +16,39 @@ locals {
   # VPC Endpoints required for EKS private clusters
   vpc_endpoints = {
     s3 = {
-      service             = "s3"
-      vpc_endpoint_type   = "Gateway"
-      route_table_ids     = module.vpc.private_route_table_ids
-      policy             = null
+      service         = "s3"
+      service_type    = "Gateway"
+      route_table_ids = module.vpc.private_route_table_ids
     }
     ecr_api = {
       service             = "ecr.api"
-      vpc_endpoint_type   = "Interface"
+      private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
       security_group_ids  = [aws_security_group.vpc_endpoints.id]
-      policy             = null
     }
     ecr_dkr = {
       service             = "ecr.dkr"
-      vpc_endpoint_type   = "Interface"
+      private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
       security_group_ids  = [aws_security_group.vpc_endpoints.id]
-      policy             = null
+    }
+    ec2 = {
+      service             = "ec2"
+      private_dns_enabled = true
+      subnet_ids          = module.vpc.private_subnets
+      security_group_ids  = [aws_security_group.vpc_endpoints.id]
+    }
+    sts = {
+      service             = "sts"
+      private_dns_enabled = true
+      subnet_ids          = module.vpc.private_subnets
+      security_group_ids  = [aws_security_group.vpc_endpoints.id]
+    }
+    logs = {
+      service             = "logs"
+      private_dns_enabled = true
+      subnet_ids          = module.vpc.private_subnets
+      security_group_ids  = [aws_security_group.vpc_endpoints.id]
     }
   }
 }

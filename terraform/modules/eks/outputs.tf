@@ -1,4 +1,4 @@
-# Simple Outputs for EKS Module
+# Outputs for EKS Module
 output "cluster_id" {
   description = "The ID of the EKS cluster"
   value       = module.eks.cluster_id
@@ -37,4 +37,9 @@ output "oidc_provider_arn" {
 output "cluster_oidc_issuer_url" {
   description = "The URL on the EKS cluster OIDC Issuer"
   value       = module.eks.cluster_oidc_issuer_url
+}
+
+output "alb_to_nodes_security_group_id" {
+  description = "Security group ID for ALB to nodes communication"
+  value       = aws_security_group.alb_to_nodes.id
 }

@@ -21,7 +21,7 @@ locals {
 }
 
 inputs = {
-  name_prefix = "eks-non-prod-irsa"
+  name_prefix = "eks-prod-irsa"
   
   roles = {
     vpc_cni = {

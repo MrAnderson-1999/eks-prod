@@ -1,0 +1,51 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    commands:
+      # Fetch the latest Terraform version
+      - TERRAFORM_VERSION=$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_version')
+
+      # Install the latest Terraform binary
+      - echo Installing Terraform version ${TERRAFORM_VERSION}
+      - curl -s -qL -o terraform_install.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+      - unzip terraform_install.zip && mv terraform /usr/bin
+
+      # Fetch the latest Terragrunt version
+      - TERRAGRUNT_VERSION=$(curl -s https://api.github.com/repos/gruntwork-io/terragrunt/releases/latest | jq -r '.tag_name')
+
+      # Install the latest Terragrunt binary
+      - echo Installing Terragrunt version ${TERRAGRUNT_VERSION}
+      - curl -Lo terragrunt "https://github.com/gruntwork-io/terragrunt/releases/download/${TERRAGRUNT_VERSION}/terragrunt_linux_amd64"
+      - chmod +x terragrunt
+      - mv terragrunt /usr/bin
+
+      # Get the ssh private key from secretsmanager and insert it to id_rsa file, for github ssh communication.
+      - SECRET_VALUE=$(aws secretsmanager get-secret-value --secret-id $SECRET_ARN_FOR_SSH_KEY --query SecretString --output text --region $REGION)
+      - mkdir -p ~/.ssh
+      - echo "$SECRET_VALUE" > ~/.ssh/id_rsa
+      - chmod 600 ~/.ssh/id_rsa
+      - ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+  build:
+    commands:
+      # Go to environment folder
+      - cd $CODEBUILD_SRC_DIR/tangibly-manage/$ENVIRONMENT
+
+      # Run terragrunt apply
+      - terragrunt run-all apply --terragrunt-exclude-dir network --terragrunt-exclude-dir server-xray/sagemaker/bge-model --terragrunt-exclude-dir server-xray/sagemaker/mistral-v220-model --terragrunt-non-interactive --terragrunt-no-color > terragrunt.log || TERRAGRUNT_EXIT=$?
+
+      # Check the successful applies
+      - grep "Apply complete" $CODEBUILD_SRC_DIR/tangibly-manage/$ENVIRONMENT/terragrunt.log || true
+
+      # Return to the source directory
+      - cd $CODEBUILD_SRC_DIR
+
+      # Run the deploy script (executed even if terragrunt fails)
+      - bash deploy-api-gateway.sh
+
+      # Exit with the original terragrunt exit code
+      - exit ${TERRAGRUNT_EXIT:-0}

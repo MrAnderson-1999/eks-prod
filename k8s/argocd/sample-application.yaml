@@ -1,0 +1,132 @@
+# Sample ArgoCD Application
+# This demonstrates how to deploy applications across environments using ArgoCD
+
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: default
+  namespace: argocd
+spec:
+  description: Default project for sample applications
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: '*'
+    server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRole
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRoleBinding
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: '*'
+  - group: 'apps'
+    kind: '*'
+  - group: 'networking.k8s.io'
+    kind: '*'
+  roles:
+  - name: admin
+    description: Admin role for the project
+    policies:
+    - p, proj:default:admin, applications, *, default/*, allow
+    - p, proj:default:admin, repositories, *, *, allow
+    groups:
+    - argocd-admins
+---
+# Sample Application for Dev Environment
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sample-app-dev
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/sample-app.git  # Replace with your repository
+    targetRevision: dev
+    path: k8s/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+# Sample Application for Staging Environment
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sample-app-stg
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/sample-app.git  # Replace with your repository
+    targetRevision: staging
+    path: k8s/overlays/stg
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: stg
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false  # Manual approval for staging
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+# Sample Application for Production Environment
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sample-app-prod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/sample-app.git  # Replace with your repository
+    targetRevision: main
+    path: k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prod
+  syncPolicy:
+    automated:
+      prune: false  # Manual pruning for production
+      selfHeal: false  # Manual healing for production
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+  # Production applications require manual approval
+  operation:
+    sync:
+      prune: false
+      dryRun: false

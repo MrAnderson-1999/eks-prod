@@ -40,3 +40,4 @@ Thumbs.db
 # Kubernetes
 kubeconfig*
 *.kubeconfig
+*.pem

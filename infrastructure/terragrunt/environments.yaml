@@ -1,0 +1,10 @@
+# terragrunt/environments.yaml
+environments:
+  non-prod:
+    bucket_suffix: "ac97c39c"
+    kms_key: "arn:aws:kms:us-west-2:740047840996:key/af7b51eb-4fae-435e-b563-1248347b5892"
+    region: "us-west-2"
+  prod:
+    bucket_suffix: "aed59318"
+    kms_key: "arn:aws:kms:us-west-2:740047840996:key/75e767ae-2e54-4962-af55-bfcfe7289346"
+    region: "us-west-2"

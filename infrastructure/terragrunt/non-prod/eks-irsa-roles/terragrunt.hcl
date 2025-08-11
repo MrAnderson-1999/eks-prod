@@ -2,86 +2,114 @@ include "root" {
   path = find_in_parent_folders("root.hcl")
 }
 
-dependency "eks" {
-  config_path = "../eks"
-  mock_outputs = {
-    oidc_provider_arn       = "arn:aws:iam::123456789012:oidc-provider/fake"
-    cluster_oidc_issuer_url = "https://oidc.eks.us-west-2.amazonaws.com/id/fake"
-  }
-}
+# No longer need dependency on EKS OIDC for Pod Identity
+# dependency "eks" {
+#   config_path = "../eks"
+#   mock_outputs = {
+#     oidc_provider_arn       = "arn:aws:iam::123456789012:oidc-provider/fake"
+#     cluster_oidc_issuer_url = "https://oidc.eks.us-west-2.amazonaws.com/id/fake"
+#   }
+# }
 
 terraform {
-  source = "../../../terraform/modules/iam-roles"
+  source = "${find_in_parent_folders("modules")}/iam-roles"
+}
+
+locals {
+  # Standard Pod Identity trust policy for all roles
+  pod_identity_trust_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "pods.eks.amazonaws.com"
+      }
+      Action = [
+        "sts:AssumeRole",
+        "sts:TagSession"
+      ]
+    }]
+  })
 }
 
 inputs = {
-  name_prefix = "eks-non-prod-irsa"
+  name_prefix = "eks-non-prod-irsa"  # Keep name for backwards compatibility
   
   roles = {
     vpc_cni = {
-      description = "VPC CNI IRSA role"
-      assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [{
-          Effect = "Allow"
-          Principal = {
-            Federated = dependency.eks.outputs.oidc_provider_arn
-          }
-          Action = "sts:AssumeRoleWithWebIdentity"
-          Condition = {
-            StringEquals = {
-              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-node"
-              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
-            }
-          }
-        }]
-      })
+      description = "VPC CNI Pod Identity role"
+      assume_role_policy = local.pod_identity_trust_policy
       managed_policy_arns = ["arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"]
       inline_policies = {}
-      tags = { Purpose = "VPC CNI IRSA" }
+      tags = { Purpose = "VPC CNI Pod Identity" }
     }
 
-    ebs_csi_driver = {
-      description = "EBS CSI driver IRSA role"
-      assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [{
-          Effect = "Allow"
-          Principal = {
-            Federated = dependency.eks.outputs.oidc_provider_arn
-          }
-          Action = "sts:AssumeRoleWithWebIdentity"
-          Condition = {
-            StringEquals = {
-              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
-              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
-            }
-          }
-        }]
-      })
-      managed_policy_arns = ["arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"]
-      inline_policies = {}
-      tags = { Purpose = "EBS CSI IRSA" }
+    # EBS CSI driver role commented out - not needed for Fargate
+    # ebs_csi_driver = {
+    #   description = "EBS CSI driver Pod Identity role"
+    #   assume_role_policy = local.pod_identity_trust_policy
+    #   managed_policy_arns = ["arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"]
+    #   inline_policies = {}
+    #   tags = { Purpose = "EBS CSI Pod Identity" }
+    # }
+
+    coredns = {
+      description = "CoreDNS Pod Identity role"
+      assume_role_policy = local.pod_identity_trust_policy
+      # CoreDNS typically doesn't need special AWS permissions, but can be used for DNS query logging to CloudWatch
+      inline_policies = {
+        dns_logging_policy = {
+          policy = jsonencode({
+            Version = "2012-10-17"
+            Statement = [
+              {
+                Effect = "Allow"
+                Action = [
+                  "logs:CreateLogGroup",
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents",
+                  "logs:DescribeLogGroups",
+                  "logs:DescribeLogStreams"
+                ]
+                Resource = "arn:aws:logs:*:*:log-group:/aws/eks/coredns/*"
+              }
+            ]
+          })
+        }
+      }
+      managed_policy_arns = []
+      tags = { Purpose = "CoreDNS Pod Identity" }
+    }
+
+    kube_proxy = {
+      description = "kube-proxy Pod Identity role"
+      assume_role_policy = local.pod_identity_trust_policy
+      # kube-proxy typically doesn't need AWS permissions, but can be used for enhanced monitoring
+      inline_policies = {
+        monitoring_policy = {
+          policy = jsonencode({
+            Version = "2012-10-17"
+            Statement = [
+              {
+                Effect = "Allow"
+                Action = [
+                  "cloudwatch:PutMetricData",
+                  "ec2:DescribeInstances",
+                  "ec2:DescribeNetworkInterfaces"
+                ]
+                Resource = "*"
+              }
+            ]
+          })
+        }
+      }
+      managed_policy_arns = []
+      tags = { Purpose = "kube-proxy Pod Identity" }
     }
 
     aws_load_balancer_controller = {
-      description = "AWS Load Balancer Controller IRSA role"
-      assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [{
-          Effect = "Allow"
-          Principal = {
-            Federated = dependency.eks.outputs.oidc_provider_arn
-          }
-          Action = "sts:AssumeRoleWithWebIdentity"
-          Condition = {
-            StringEquals = {
-              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:kube-system:aws-load-balancer-controller"
-              "${replace(dependency.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
-            }
-          }
-        }]
-      })
+      description = "AWS Load Balancer Controller Pod Identity role"
+      assume_role_policy = local.pod_identity_trust_policy
       
       # Use comprehensive ALB controller policy
       inline_policies = {
@@ -252,7 +280,7 @@ inputs = {
         }
       }
       managed_policy_arns = []
-      tags = { Purpose = "ALB Controller IRSA" }
+      tags = { Purpose = "ALB Controller Pod Identity" }
     }
   }
 }

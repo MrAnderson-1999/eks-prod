@@ -13,8 +13,8 @@ module "eks" {
   cluster_endpoint_public_access  = false
   cluster_endpoint_private_access = true
 
-  # IRSA disabled - using Pod Identity instead
-  enable_irsa = false
+  # IRSA enablement (required for aws-load-balancer-controller on Fargate)
+  enable_irsa = var.enable_irsa
 
   # Match current cluster configuration to prevent replacement
   bootstrap_self_managed_addons = false
@@ -140,3 +140,17 @@ resource "aws_security_group" "alb_to_nodes" {
 }
 
 data "aws_caller_identity" "current" {}
+
+
+# In your EKS module
+data "tls_certificate" "cluster" {
+  url = module.eks.cluster_oidc_issuer_url
+}
+
+resource "aws_iam_openid_connect_provider" "cluster" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.cluster.certificates[0].sha1_fingerprint]
+  url             = module.eks.cluster_oidc_issuer_url
+
+  tags = var.tags
+}

@@ -63,6 +63,9 @@ inputs = {
   # Fargate Configuration - Serverless container hosting
   enable_fargate = true
 
+  # Enable IRSA (required for ALB Controller on Fargate)
+  enable_irsa = true
+
   tags = {
     Environment = "non-prod"
     Project     = "eks-security"

@@ -1,27 +1,10 @@
-# ALB Controller Standalone Deployment
-# This module deploys the AWS Load Balancer Controller to EKS
-# Requires: EKS cluster with public API access
-
-# Inputs are provided directly (no remote state dependency)
-
-# Create service account for ALB controller
-resource "kubernetes_service_account" "aws_load_balancer_controller" {
-  metadata {
-    name      = "aws-load-balancer-controller"
-    namespace = "kube-system"
-    annotations = {
-      "eks.amazonaws.com/role-arn" = var.alb_controller_role_arn
-    }
-  }
-}
-
-# Deploy ALB controller via Helm
+# Deploy ALB Controller via Helm
 resource "helm_release" "aws_load_balancer_controller" {
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
-  version    = var.chart_version
+  version    = "1.11.0"
 
   set {
     name  = "clusterName"
@@ -30,7 +13,7 @@ resource "helm_release" "aws_load_balancer_controller" {
 
   set {
     name  = "serviceAccount.create"
-    value = "false"
+    value = "false"  # We create it separately above
   }
 
   set {
@@ -44,9 +27,11 @@ resource "helm_release" "aws_load_balancer_controller" {
   }
 
   set {
-    name  = "vpcId"
+    name  = "vpcId" 
     value = var.vpc_id
   }
 
-  depends_on = [kubernetes_service_account.aws_load_balancer_controller]
+  depends_on = [
+    kubernetes_service_account.aws_load_balancer_controller
+  ]
 }

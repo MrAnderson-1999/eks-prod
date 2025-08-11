@@ -19,11 +19,6 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "alb_controller_role_arn" {
-  description = "IAM role ARN for the ALB Controller service account"
-  type        = string
-}
-
 variable "enable_waf" {
   description = "Enable AWS WAF v2 support"
   type        = bool
@@ -44,4 +39,8 @@ variable "log_level" {
     condition     = contains(["debug", "info", "warn", "error"], var.log_level)
     error_message = "Log level must be one of: debug, info, warn, error."
   }
+}
+variable "oidc_provider_url" {
+  description = "URL of the OIDC provider"
+  type        = string
 }

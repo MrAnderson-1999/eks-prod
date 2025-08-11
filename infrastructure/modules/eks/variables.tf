@@ -60,6 +60,12 @@ variable "enable_fargate" {
   default     = true
 }
 
+variable "enable_irsa" {
+  description = "Enable IAM Roles for Service Accounts (IRSA) on the cluster"
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags for all resources"
   type        = map(string)

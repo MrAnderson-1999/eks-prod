@@ -77,6 +77,24 @@ inputs = {
           to_port     = 65535
           protocol    = "udp"
           self        = true
+        },
+        {
+          description    = "ALB to pods HTTP"
+          from_port      = 80
+          to_port        = 80
+          protocol       = "tcp"
+          security_groups = [
+            aws_security_group_main_ids["eks_alb"]
+          ]
+        },
+        {
+          description    = "ALB to pods HTTPS"
+          from_port      = 443
+          to_port        = 443
+          protocol       = "tcp"
+          security_groups = [
+            aws_security_group_main_ids["eks_alb"]
+          ]
         }
       ]
       

@@ -14,7 +14,7 @@ dependency "vpc" {
 
 # Set the source of the module
 terraform {
-  source = "../../../terraform/modules/security-groups"
+  source = "${find_in_parent_folders("modules")}/security-groups"
 }
 
 inputs = {

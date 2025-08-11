@@ -5,7 +5,7 @@ include "root" {
 
 # Set the source of the module
 terraform {
-  source = "../../../terraform/modules/vpc"
+  source = "${find_in_parent_folders("modules")}/vpc"
 }
 
 # Module-specific variables
@@ -13,6 +13,7 @@ inputs = {
   name                  = "eks-security-non-prod"
   environment          = "non-prod"
   aws_region           = "us-west-2"
+  cluster_name         = "eks-security-non-prod"
   
   # VPC Configuration
   vpc_cidr = "10.0.0.0/16"

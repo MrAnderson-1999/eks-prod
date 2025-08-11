@@ -1,54 +1,53 @@
-# Include root configuration
 include "root" {
   path = find_in_parent_folders("root.hcl")
 }
 
 dependency "vpc" {
-  config_path = "../vpc"
+  config_path = "../../vpc"
   mock_outputs = {
-    vpc_id             = "vpc-fake"
-    private_subnets    = ["subnet-fake1", "subnet-fake2"]
-    vpc_cidr_block     = "10.0.0.0/16"
+    vpc_id          = "vpc-mock"
+    private_subnets = ["subnet-mock1", "subnet-mock2"]
+    vpc_cidr_block  = "10.0.0.0/16"
   }
 }
 
 dependency "kms" {
-  config_path = "../kms"
+  config_path = "../../kms"
   mock_outputs = {
     kms_keys = {
       eks_security = {
-        arn = "arn:aws:kms:us-west-2:123456789012:key/fake"
+        arn = "arn:aws:kms:us-west-2:123456789012:key/mock-key-id"
       }
     }
   }
 }
 
 dependency "global_roles" {
-  config_path = "../global-roles"
+  config_path = "../../roles/global"
   mock_outputs = {
     role_arns = {
-      eks_cluster    = "arn:aws:iam::123456789012:role/fake-cluster-role"
-      eks_node_group = "arn:aws:iam::123456789012:role/fake-node-role"
+      eks_cluster                 = "arn:aws:iam::123456789012:role/mock-eks-cluster-role"
+      eks_fargate_pod_execution  = "arn:aws:iam::123456789012:role/mock-fargate-role"
     }
   }
 }
 
 dependency "security" {
-  config_path = "../security"
+  config_path = "../../security"
   mock_outputs = {
     security_group_ids = {
-      eks_nodes = "sg-fake"
+      eks_nodes = "sg-mock"
     }
   }
 }
 
 terraform {
-  source = "../../../terraform/modules/eks"
+  source = "${find_in_parent_folders("modules")}/eks"
 }
 
 inputs = {
   cluster_name    = "eks-security-non-prod"
-  cluster_version = "1.29"
+  cluster_version = "1.32" # Latest Kubernetes version
 
   # Network Configuration
   vpc_id              = dependency.vpc.outputs.vpc_id
@@ -58,15 +57,11 @@ inputs = {
   # Security Configuration
   kms_key_arn                   = dependency.kms.outputs.kms_keys.eks_security.arn
   cluster_service_role_arn      = dependency.global_roles.outputs.role_arns.eks_cluster
-  node_group_role_arn          = dependency.global_roles.outputs.role_arns.eks_node_group
+  fargate_profile_role_arn      = dependency.global_roles.outputs.role_arns.eks_fargate_pod_execution
   additional_security_group_ids = [dependency.security.outputs.security_group_ids.eks_nodes]
 
-  # Node Configuration
-  node_instance_types = ["t3.medium"]
-  node_capacity_type  = "ON_DEMAND"
-  node_min_size      = 1
-  node_max_size      = 3
-  node_desired_size  = 2
+  # Fargate Configuration - Serverless container hosting
+  enable_fargate = true
 
   tags = {
     Environment = "non-prod"

@@ -7,7 +7,7 @@ include "root" {
 
 # Set the source of the module
 terraform {
-  source = "../../../terraform/modules/kms"
+  source = "${find_in_parent_folders("modules")}/kms"
 }
 
 inputs = {
@@ -19,6 +19,7 @@ inputs = {
       enable_key_rotation = true
       key_usage = "ENCRYPT_DECRYPT"
       customer_master_key_spec = "SYMMETRIC_DEFAULT"
+      aliases = ["eks-security-non-prod-kms-key"]
     }
     
   }

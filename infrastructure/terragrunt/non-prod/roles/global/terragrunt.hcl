@@ -5,7 +5,7 @@ include "root" {
 
 # Set the source of the module
 terraform {
-  source = "../../../terraform/modules/iam-roles"
+  source = "${find_in_parent_folders("modules")}/iam-roles"
 }
 
 inputs = {
@@ -106,7 +106,7 @@ inputs = {
       })
       
       managed_policy_arns = [
-        "arn:aws:iam::aws:policy/AWSCodePipelineFullAccess"  # Valid CodePipeline policy
+        "arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess"  # Correct CodePipeline policy name
       ]
       
       tags = {

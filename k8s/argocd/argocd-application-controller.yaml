@@ -1,0 +1,119 @@
+# ArgoCD Application Controller
+# Manages application deployments and synchronization
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-application-controller
+  namespace: argocd
+  labels:
+    app.kubernetes.io/component: application-controller
+    app.kubernetes.io/name: argocd-application-controller
+    app.kubernetes.io/part-of: argocd
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: argocd-application-controller
+  namespace: argocd
+  labels:
+    app.kubernetes.io/component: application-controller
+    app.kubernetes.io/name: argocd-application-controller
+    app.kubernetes.io/part-of: argocd
+spec:
+  replicas: 1
+  serviceName: argocd-application-controller
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-application-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argocd-application-controller
+    spec:
+      serviceAccountName: argocd-application-controller
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+      - name: argocd-application-controller
+        image: quay.io/argoproj/argocd:v2.9.3
+        imagePullPolicy: Always
+        command:
+        - argocd-application-controller
+        - --status-processors
+        - "20"
+        - --operation-processors
+        - "10"
+        - --app-resync
+        - "180"
+        - --repo-server
+        - argocd-repo-server:8081
+        - --logformat
+        - text
+        - --logLevel
+        - info
+        - --redis
+        - argocd-redis:6379
+        ports:
+        - containerPort: 8082
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8082
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8082
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /app/config/controller/tls
+          name: argocd-repo-server-tls
+        - mountPath: /home/argocd
+          name: argocd-home
+        - mountPath: /tmp
+          name: tmp
+      volumes:
+      - name: argocd-repo-server-tls
+        secret:
+          secretName: argocd-repo-server-tls
+          optional: true
+      - emptyDir: {}
+        name: argocd-home
+      - emptyDir: {}
+        name: tmp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-application-controller-metrics
+  namespace: argocd
+  labels:
+    app.kubernetes.io/component: application-controller
+    app.kubernetes.io/name: argocd-application-controller-metrics
+    app.kubernetes.io/part-of: argocd
+spec:
+  ports:
+  - name: metrics
+    port: 8082
+    protocol: TCP
+    targetPort: 8082
+  selector:
+    app.kubernetes.io/name: argocd-application-controller

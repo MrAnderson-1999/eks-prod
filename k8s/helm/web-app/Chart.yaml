@@ -1,0 +1,17 @@
+apiVersion: v2
+name: web-app
+description: Generic web application chart with optional ConfigMap, Service, and Ingress
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - web
+  - nginx
+  - application
+home: https://example.com
+sources:
+  - https://example.com/repo
+maintainers:
+  - name: platform-team
+    email: platform@example.com
+

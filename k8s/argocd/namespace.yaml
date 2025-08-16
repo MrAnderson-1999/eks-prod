@@ -1,0 +1,13 @@
+# ArgoCD namespace
+# Dedicated namespace for ArgoCD components
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    name: argocd
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: namespace
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"

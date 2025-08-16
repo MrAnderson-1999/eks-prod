@@ -1,0 +1,198 @@
+# ArgoCD Server Configuration
+# This file contains the main ArgoCD server deployment and services
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-server-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-server-config
+    app.kubernetes.io/part-of: argocd
+data:
+  url: "https://argocd.DOMAIN_NAME"
+  application.instanceLabelKey: argocd.argoproj.io/instance
+  server.rbac.log.enforce.enable: "true"
+  exec.enabled: "false"
+  server.enable.proxy.extension: "true"
+  accounts.admin: apiKey, login
+  accounts.admin.enabled: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-secret
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-secret
+    app.kubernetes.io/part-of: argocd
+type: Opaque
+data:
+  # Generate these values:
+  # admin.password: bcrypt hash of the password
+  # server.secretkey: base64 encoded random string
+  admin.password: JDJiJDEwJE9yYlc4aHhZSDAuVC9qcTJ1N3BaZU9ubVJGUlFVaUJ1TWJaRzdiWWVwRnNYMTZRS25hclpp  # admin
+  server.secretkey: YWJjZGVmZ2hpams=  # abcdefghijk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: argocd-server
+    spec:
+      serviceAccountName: argocd-server
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+      - name: argocd-server
+        image: quay.io/argoproj/argocd:v2.9.3
+        imagePullPolicy: Always
+        command:
+        - argocd-server
+        - --staticassets
+        - /shared/app
+        - --repo-server
+        - argocd-repo-server:8081
+        - --dex-server
+        - http://argocd-dex-server:5556
+        - --logformat
+        - text
+        - --logLevel
+        - info
+        - --redis
+        - argocd-redis:6379
+        ports:
+        - containerPort: 8080
+        - containerPort: 8083
+        livenessProbe:
+          httpGet:
+            path: /healthz?full=true
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 30
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 125m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /app/config/ssh
+          name: ssh-known-hosts
+        - mountPath: /app/config/tls
+          name: tls-certs
+        - mountPath: /app/config/server/tls
+          name: argocd-server-tls
+        - mountPath: /home/argocd
+          name: plugins-home
+        - mountPath: /tmp
+          name: tmp
+      volumes:
+      - configMap:
+          name: argocd-ssh-known-hosts-cm
+        name: ssh-known-hosts
+      - configMap:
+          name: argocd-tls-certs-cm
+        name: tls-certs
+      - name: argocd-server-tls
+        secret:
+          secretName: argocd-server-tls
+          optional: true
+      - emptyDir: {}
+        name: plugins-home
+      - emptyDir: {}
+        name: tmp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+spec:
+  type: ClusterIP
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 8080
+  - name: grpc
+    port: 443
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/name: argocd-server
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-ingress
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/load-balancer-name: argocd-alb
+    alb.ingress.kubernetes.io/group.name: argocd
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+spec:
+  rules:
+  - host: argocd.dev.local  # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 443

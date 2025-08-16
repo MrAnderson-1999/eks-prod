@@ -92,23 +92,23 @@ module "vpc" {
   flow_log_cloudwatch_log_group_retention_in_days = var.flow_log_retention_days
 
   # EKS-specific subnet tags (Names set via subnet_names parameters)
-  public_subnet_tags = {
+  public_subnet_tags = merge({
     "kubernetes.io/role/elb" = "1"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
     "kubernetes.io/subnets/role" = "public"
     "karpenter.sh/discovery" = "${var.name}-${var.environment}"
     "Type" = "Public"
     "Tier" = "Public"
-  }
+  }, var.public_subnet_tags)
 
-  private_subnet_tags = {
+  private_subnet_tags = merge({
     "kubernetes.io/role/internal-elb" = "1"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
     "kubernetes.io/subnets/role" = "private"
     "karpenter.sh/discovery" = "${var.name}-${var.environment}"
     "Type" = "Private"
     "Tier" = "Private"
-  }
+  }, var.private_subnet_tags)
 
   tags = local.common_tags
 }

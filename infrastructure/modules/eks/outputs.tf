@@ -1,4 +1,7 @@
-# Outputs for EKS Module
+#==============================================================================
+# CORE EKS CLUSTER OUTPUTS
+#==============================================================================
+
 output "cluster_id" {
   description = "The ID of the EKS cluster"
   value       = module.eks.cluster_id
@@ -29,6 +32,11 @@ output "node_security_group_id" {
   value       = module.eks.node_security_group_id
 }
 
+output "cluster_certificate_authority_data" {
+  description = "Base64 encoded certificate data required to communicate with the cluster"
+  value       = module.eks.cluster_certificate_authority_data
+}
+
 output "oidc_provider_arn" {
   description = "The ARN of the OIDC Provider for IRSA"
   value       = module.eks.oidc_provider_arn
@@ -39,13 +47,12 @@ output "cluster_oidc_issuer_url" {
   value       = module.eks.cluster_oidc_issuer_url
 }
 
-output "alb_to_nodes_security_group_id" {
-  description = "Security group ID for ALB to nodes communication"
-  value       = aws_security_group.alb_to_nodes.id
+output "vpc_id" {
+  description = "VPC ID where the cluster is deployed"
+  value       = var.vpc_id
 }
 
-output "cluster_certificate_authority_data" {
-  description = "Base64 encoded certificate data required to communicate with the cluster"
-  value       = module.eks.cluster_certificate_authority_data
+output "private_subnet_ids" {
+  description = "Private subnet IDs used by the cluster"
+  value       = var.private_subnet_ids
 }
-

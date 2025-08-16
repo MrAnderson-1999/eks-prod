@@ -10,8 +10,6 @@ metadata:
     app.kubernetes.io/component: server
     app.kubernetes.io/name: argocd-server
     app.kubernetes.io/part-of: argocd
-  annotations:
-    eks.amazonaws.com/role-arn: "REPLACE_WITH_ARGOCD_ROLE_ARN"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -181,7 +179,6 @@ metadata:
     alb.ingress.kubernetes.io/backend-protocol: HTTPS
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: '443'
-    alb.ingress.kubernetes.io/certificate-arn: "CERTIFICATE_ARN"  # Replace with your ACM certificate ARN
     alb.ingress.kubernetes.io/load-balancer-name: argocd-alb
     alb.ingress.kubernetes.io/group.name: argocd
     alb.ingress.kubernetes.io/healthcheck-path: /healthz
@@ -189,7 +186,7 @@ metadata:
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
 spec:
   rules:
-  - host: argocd.DOMAIN_NAME  # Replace with your domain
+  - host: argocd.dev.local  # Replace with your domain
     http:
       paths:
       - path: /

@@ -1,3 +1,15 @@
+#==============================================================================
+# DATA SOURCES
+#==============================================================================
+
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+data "aws_availability_zones" "available" {}
+
+#==============================================================================
+# EKS CLUSTER WITH BASIC CONFIGURATION
+#==============================================================================
+
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
@@ -9,148 +21,76 @@ module "eks" {
   vpc_id     = var.vpc_id
   subnet_ids = var.private_subnet_ids
 
-  # SECURITY: Private cluster configuration
-  cluster_endpoint_public_access  = false
-  cluster_endpoint_private_access = true
+  # Endpoint Configuration
+  cluster_endpoint_public_access       = var.cluster_endpoint_public_access
+  cluster_endpoint_private_access      = var.cluster_endpoint_private_access
+  cluster_endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
 
-  # IRSA enablement (required for aws-load-balancer-controller on Fargate)
-  enable_irsa = var.enable_irsa
+  # IRSA Configuration - ESSENTIAL
+  enable_irsa = true
 
-  # Match current cluster configuration to prevent replacement
-  bootstrap_self_managed_addons = false
-
-  # Access entries managed separately to avoid circular dependencies
-  # Use AWS CLI or separate terraform module for access entries
-
-  # KMS encryption - FIXED FORMAT
-  create_kms_key = false
-  cluster_encryption_config = {
+  # KMS Encryption
+  create_kms_key = var.create_kms_key
+  cluster_encryption_config = var.kms_key_arn != null ? {
     provider_key_arn = var.kms_key_arn
     resources        = ["secrets"]
-  }
+  } : {}
 
-  # Logging
-  cluster_enabled_log_types              = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
-  cloudwatch_log_group_retention_in_days = 30
+  # CloudWatch Logging
+  cluster_enabled_log_types              = var.cluster_enabled_log_types
+  cloudwatch_log_group_retention_in_days = var.cloudwatch_log_group_retention_in_days
 
-  # Fargate Profiles - Serverless container hosting
-  fargate_profiles = {
-    default = {
-      name = "default"
-      selectors = [
-        {
-          namespace = "default"
-        },
-        {
-          namespace = "kube-system"
-        }
-      ]
+  # EKS Managed Node Groups
+  eks_managed_node_groups = {
+    for name, config in var.node_groups : name => {
+      min_size       = config.min_size
+      max_size       = config.max_size
+      desired_size   = config.desired_size
+      instance_types = config.instance_types
+      capacity_type  = config.capacity_type
       
-      subnet_ids = var.private_subnet_ids
+      # Node group configuration
+      ami_type  = lookup(config, "ami_type", "AL2_x86_64")
+      disk_size = lookup(config, "disk_size", 20)
       
-      # Use external IAM role
-      create_iam_role = false
-      iam_role_arn    = var.fargate_profile_role_arn
+      # Labels and taints
+      labels = lookup(config, "labels", {})
+      taints = lookup(config, "taints", [])
       
-      tags = merge(var.tags, {
-        Purpose = "Serverless workloads"
-      })
-    }
-    
-    applications = {
-      name = "applications"
-      selectors = [
-        {
-          namespace = "applications"
-        },
-        {
-          namespace = "monitoring"
-        },
-        {
-          namespace = "logging"
-        }
-      ]
-      
-      subnet_ids = var.private_subnet_ids
-      
-      # Use external IAM role
-      create_iam_role = false
-      iam_role_arn    = var.fargate_profile_role_arn
-      
-      tags = merge(var.tags, {
-        Purpose = "Application workloads"
-      })
+      # Update configuration
+      update_config = {
+        max_unavailable_percentage = lookup(config, "max_unavailable_percentage", 25)
+      }
     }
   }
 
-  # EKS Add-ons for Fargate deployment (serverless - no EBS CSI driver needed)
+  # Basic Core Add-ons Only (no IRSA dependencies)
   cluster_addons = {
-    # Pod Identity Agent - New recommended approach for IAM roles
-    eks-pod-identity-agent = {
-      addon_version = "v1.3.8-eksbuild.2"  # Latest for K8s 1.32
-    }
-    
     coredns = {
-      addon_version = "v1.11.4-eksbuild.14"  # Latest for K8s 1.32
+      addon_version     = var.coredns_version
+      resolve_conflicts = "OVERWRITE"
     }
     
     kube-proxy = {
-      addon_version = "v1.32.6-eksbuild.2"  # Latest for K8s 1.32
+      addon_version     = var.kube_proxy_version
+      resolve_conflicts = "OVERWRITE"
     }
     
+    # Basic VPC CNI without IRSA
     vpc-cni = {
-      addon_version = "v1.20.1-eksbuild.1"  # Latest for K8s 1.32
+      addon_version     = var.vpc_cni_version
+      resolve_conflicts = "OVERWRITE"
     }
-    
-    # EBS CSI driver removed - Fargate uses ephemeral storage only
   }
 
-  # Use external IAM roles
-  create_iam_role = false
-  iam_role_arn    = var.cluster_service_role_arn
-
-  tags = var.tags
-}
-
-# ALB to nodes security group
-resource "aws_security_group" "alb_to_nodes" {
-  name_prefix = "${var.cluster_name}-alb-to-nodes"
-  description = "Security group for ALB to nodes communication"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    description = "ALB to nodes"
-    from_port   = 30000
-    to_port     = 32767
-    protocol    = "tcp"
-    cidr_blocks = var.vpc_cidr_blocks
+  # Access Entries for Admin Access
+  access_entries = {
+    for idx, arn in var.admin_role_arns : "admin-${idx}" => {
+      principal_arn     = arn
+      kubernetes_groups = ["system:masters"]
+      type             = "STANDARD"
+    }
   }
-
-  egress {
-    description = "All outbound traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(var.tags, {
-    Name = "${var.cluster_name}-alb-to-nodes-sg"
-  })
-}
-
-data "aws_caller_identity" "current" {}
-
-
-# In your EKS module
-data "tls_certificate" "cluster" {
-  url = module.eks.cluster_oidc_issuer_url
-}
-
-resource "aws_iam_openid_connect_provider" "cluster" {
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.tls_certificate.cluster.certificates[0].sha1_fingerprint]
-  url             = module.eks.cluster_oidc_issuer_url
 
   tags = var.tags
 }

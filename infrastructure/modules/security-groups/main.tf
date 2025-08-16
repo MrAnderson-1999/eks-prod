@@ -80,3 +80,16 @@ resource "aws_security_group_rule" "alb_to_nodes_http" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.main["eks_alb"].id
 }
+
+# Optional inter-group rule: allow HTTPS from ALB SG to Nodes/Pods SG
+resource "aws_security_group_rule" "alb_to_nodes_https" {
+  count = local.create_alb_to_nodes_http ? 1 : 0
+
+  type                     = "ingress"
+  security_group_id        = aws_security_group.main["eks_nodes"].id
+  description              = "HTTPS from ALB"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.main["eks_alb"].id
+}

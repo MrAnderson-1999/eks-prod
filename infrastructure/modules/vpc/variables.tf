@@ -62,6 +62,18 @@ variable "cluster_name" {
   type        = string
 }
 
+variable "public_subnet_tags" {
+  description = "Additional tags to apply to public subnets"
+  type        = map(string)
+  default     = {}
+}
+
+variable "private_subnet_tags" {
+  description = "Additional tags to apply to private subnets"
+  type        = map(string)
+  default     = {}
+}
+
 variable "enable_nat_gateway" {
   description = "Should be true to provision NAT Gateways for each of your private networks"
   type        = bool

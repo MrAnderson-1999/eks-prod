@@ -1,19 +1,43 @@
-apiVersion: v1
-kind: ConfigMap
+# Ingress with IP target type
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: nginx-200-conf
-  labels:
-    app: nginx-200
-data:
-  default.conf: |
-    server {
-      listen 80;
-      server_name _;
-      default_type text/plain;
-      location / {
-        return 200 "ok\n";
-      }
-    }
+  name: my-app-ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip  # Key annotation!
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: my-app-service
+            port:
+              number: 80 # 80 is the port the service is listening on
+      - path: /argocd
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server # argocd-server is the name of the service
+            port:
+              number: 443
+---
+# Service as ClusterIP (most common)
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-service
+spec:
+  type: ClusterIP  # Not NodePort!
+  selector:
+    app: my-app
+  ports:
+  - port: 80 # 80 is the port the service is listening on
+    targetPort: 8080 # 8080 is the port the container is listening on
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -35,11 +59,11 @@ spec:
         - name: nginx
           image: nginx:alpine
           ports:
-            - containerPort: 80
+            - containerPort: 8080 # 8080 is the port the container is listening on
           readinessProbe:
             httpGet:
               path: /
-              port: 80
+              port: 8080
             initialDelaySeconds: 2
             periodSeconds: 5
           volumeMounts:
@@ -52,41 +76,18 @@ spec:
             name: nginx-200-conf
 ---
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: nginx-200
-  labels:
-    app: nginx-200
-spec:
-  type: ClusterIP
-  selector:
-    app: nginx-200
-  ports:
-    - name: http
-      port: 80
-      targetPort: 80
+  name: nginx-200-conf
+data:
+  default.conf: |
+    server {
+      listen 80;
+      server_name _;
+      default_type text/plain;
+      location / {
+        return 200 "ok\n";
+      }
+    }
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: nginx-200
-  labels:
-    app: nginx-200
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/healthcheck-path: /
-    # HTTP only (no TLS)
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
-spec:
-  ingressClassName: alb
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: nginx-200
-                port:
-                  number: 80
+
